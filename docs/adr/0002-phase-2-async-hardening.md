@@ -42,16 +42,16 @@ Python. Each of these had more than one reasonable shape.
   `test_ingest_article_marks_failed_after_exhausting_retries`) flip
   `CELERY_TASK_EAGER_PROPAGATES` to `False` locally via the `settings` fixture,
   rather than changing that default for every test.
-- **Compose scope**: `compose.yaml` and a new root `Dockerfile` cover exactly
-  what phase 2 needs — `redis` (the Celery broker) and `worker` (the Celery
-  worker, built from the repo). Ollama is intentionally left out of Compose and
-  reached via `host.docker.internal` (`CLAUDE.md` already documents Ollama as a
-  local service via `OLLAMA_BASE_URL`). Postgres and a containerized `web`
-  service are also left out — the app still runs on SQLite with no
-  `DATABASE_URL` wiring, so containerizing the web process is a separate,
-  larger change. The Makefile's `infra`/`pull-model` targets, which predated
-  this file and referenced `db`/`ollama` services, were updated to match what
-  actually exists now instead of left dangling.
+- **Compose scope**: `compose.yaml` and a new root `Dockerfile` cover the first
+  slice of what the Makefile already anticipated (`infra`/`pull-model`
+  reference `db` and `ollama` services) — `redis` (the Celery broker) and
+  `worker` (the Celery worker, built from the repo). Postgres and Ollama as
+  Docker services, and a containerized `web` service, are follow-up phases, not
+  a permanent scope cut — the app still runs on SQLite with no `DATABASE_URL`
+  wiring, and Ollama runs on the host for now, reached via
+  `host.docker.internal`. The Makefile's `infra`/`pull-model` targets are left
+  referencing `db`/`ollama` as-is (they'll start working once those services
+  land) rather than rewritten around today's partial `compose.yaml`.
 
 ## Trade-offs
 
@@ -67,8 +67,10 @@ Python. Each of these had more than one reasonable shape.
   just burn 3 attempts on something that will never succeed — but it does mean
   a real Ollama outage that manifests as, say, a JSON decode error rather than
   an HTTP error would not benefit from backoff.
-- `make infra`/`make up` no longer bring up "the full stack" as the old README
-  wording implied — they bring up Redis (+ worker for `up`). Postgres, Ollama,
-  and a web container are still missing, so local end-to-end testing beyond
-  what SQLite + a locally-run `runserver` + this compose file cover still
-  requires manual setup.
+- `make infra` and `make pull-model` still reference the `db`/`ollama` compose
+  services from the original Makefile scaffold, which don't exist in
+  `compose.yaml` yet — they'll error if run today. Left as-is deliberately
+  (matching the pre-existing README note that these targets activate once the
+  full stack lands) rather than quietly rewritten to only describe what phase 2
+  shipped; `make up` (redis + worker) and a locally-run Ollama are what actually
+  works right now, documented in the README's "Try it" section.

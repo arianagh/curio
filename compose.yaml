@@ -9,8 +9,8 @@ services:
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      # Ollama runs on the host, not in compose (see CLAUDE.md) — reach it
-      # through the docker-provided gateway host.
+      # Ollama isn't containerized yet (coming in a later phase) — reach the
+      # host-run instance through the docker-provided gateway host.
       OLLAMA_BASE_URL: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
