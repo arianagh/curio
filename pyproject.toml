@@ -15,6 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "django-stubs[compatible-mypy]>=6.0.7",
     "factory-boy>=3.3.3",
     "mypy>=2.3.0",
     "pytest>=9.1.1",
@@ -23,3 +24,14 @@ dev = [
     "respx>=0.23.1",
     "ruff>=0.15.21",
 ]
+
+[tool.mypy]
+mypy_path = "src"
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "curio.settings"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "curio.settings"
+pythonpath = ["src"]
