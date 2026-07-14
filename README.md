@@ -19,8 +19,11 @@ release — so you can follow the whole build from an empty scaffold to a workin
 
 - [`uv`](https://docs.astral.sh/uv/getting-started/installation/) — manages the Python
   version (3.14) and dependencies; nothing else to install by hand
-- [Docker](https://docs.docker.com/get-docker/) — runs the local Postgres, Redis, and
-  Ollama services (see note below on current phase)
+- [Docker](https://docs.docker.com/get-docker/) — runs Redis and the Celery worker via
+  `compose.yaml` (`make infra` / `make up`); Postgres and a containerized web service
+  aren't wired up yet (see note below on current phase)
+- [Ollama](https://ollama.com/) — runs locally, *not* in Docker; used for article
+  summarization (`OLLAMA_BASE_URL`, default `http://localhost:11434`)
 - [`gh`](https://cli.github.com/) — the GitHub CLI, used to open PRs and cut releases
 
 ## Quick start
@@ -36,6 +39,38 @@ cd src && uv run python manage.py runserver
 broker) in Docker; `make up` builds and starts Redis plus the Celery worker. Ollama
 still runs locally (`OLLAMA_BASE_URL`) — see `make pull-model`. Postgres and a
 containerized web service aren't wired up yet.
+
+## Try it
+
+Everything below assumes `make check` has already passed and the database is
+migrated (see Quick start).
+
+1. Start Ollama locally and pull the model ingest uses, if you haven't already:
+   ```
+   ollama serve &
+   make pull-model
+   ```
+2. Start Redis + the Celery worker, and the API, in two terminals:
+   ```
+   make up                                    # terminal 1: redis + worker (Docker)
+   cd src && uv run python manage.py runserver  # terminal 2: the API
+   ```
+3. Create a user and log in:
+   ```
+   make superuser                             # prompts for username/password
+   TOKEN=$(curl -s localhost:8000/api/v1/auth/token \
+     -H "Content-Type: application/json" \
+     -d '{"username": "you", "password": "your-password"}' | jq -r .access)
+   ```
+4. Submit an article and poll it until it's enriched:
+   ```
+   curl -s localhost:8000/api/v1/articles \
+     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com"}'
+
+   curl -s localhost:8000/api/v1/articles/<id-from-above> \
+     -H "Authorization: Bearer $TOKEN"
+   ```
 
 ## API
 
