@@ -18,11 +18,11 @@ if printf '%s' "$CMD" | grep -Eq 'git +push.*(--force|-f)([[:space:]]|$)'; then
   exit 2
 fi
 
-# 2) block commits made while on main
+# 2) block commits made while on master
 if printf '%s' "$CMD" | grep -Eq 'git +commit'; then
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-  if [ "$BRANCH" = "main" ]; then
-    echo "Blocked: you're on main. Start a phase branch first, e.g. git switch -c feat/phase-N-slug" >&2
+  if [ "$BRANCH" = "master" ]; then
+    echo "Blocked: you're on master. Start a phase branch first, e.g. git switch -c feat/phase-N-slug" >&2
     exit 2
   fi
 fi
