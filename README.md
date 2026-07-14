@@ -32,8 +32,10 @@ cd src && uv run python manage.py migrate
 cd src && uv run python manage.py runserver
 ```
 
-`make help` lists every available target. Once a `docker-compose.yml` lands (see
-below), `make infra` / `make up` / `make down` will bring up the full stack.
+`make help` lists every available target. `make infra` brings up Redis (the Celery
+broker) in Docker; `make up` builds and starts Redis plus the Celery worker. Ollama
+still runs locally (`OLLAMA_BASE_URL`) — see `make pull-model`. Postgres and a
+containerized web service aren't wired up yet.
 
 ## API
 
@@ -50,7 +52,9 @@ get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
 Articles are ingested asynchronously via Celery: `POST` returns immediately with
 `status: "pending"`, then the article moves `pending` → `fetching` →
 `enriched`/`failed` as the task fetches the url and summarizes it through Ollama.
-Poll `GET /articles/{id}` to watch it resolve.
+Poll `GET /articles/{id}` to watch it resolve. Fetch/summarize failures are retried
+up to 3 times with exponential backoff before the article is marked `failed`; a task
+re-run on an already-`enriched` article is a no-op.
 
 ## Follow the build
 
@@ -67,9 +71,11 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.2-library` — accounts (JWT auth) and library (`Article`/`Tag`)
-core domain: owner-scoped models, the articles/tags API, and async ingest via Celery
-+ Ollama. Still no Docker Compose file.
+**Current phase:** `v0.3-async` — hardens ingest: retry with exponential backoff on
+fetch/summarize failures, an idempotency guard against redelivered/duplicate task
+runs, ingest logic extracted into `library/services.py`, and a first
+`compose.yaml` (Redis + Celery worker; Ollama stays local, Postgres/web still
+pending).
 
 ## Contributing
 
