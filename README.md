@@ -69,8 +69,10 @@ migrated (see Quick start).
 
 ## API
 
-All routes are mounted under `/api/v1/`. Authenticate with `POST /auth/token` to
-get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
+All routes are mounted under `/api/v1/`. Interactive Swagger docs (django-ninja's
+built-in, auto-generated from the schemas below) are at `/api/v1/docs`; the raw
+OpenAPI schema is at `/api/v1/openapi.json`. Authenticate with `POST /auth/token`
+to get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
 
 - `POST /auth/token` — `{username, password}` → `{access, refresh}`
 - `POST /articles` — `{url}`; `202` if a new ingest was queued, `200` (with the
