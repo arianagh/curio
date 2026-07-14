@@ -6,8 +6,8 @@
 help:  ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-infra:  ## Start only the infra (db, redis, ollama) for the host fast-loop
-	docker compose up -d db redis ollama
+infra:  ## Start only the broker (redis) for the host fast-loop; Ollama runs locally (see CLAUDE.md)
+	docker compose up -d redis
 
 up:  ## Build and start the full stack
 	docker compose up --build
@@ -47,5 +47,5 @@ superuser:  ## Create a Django superuser
 shell:  ## Django shell (auto-imports models on 5.2)
 	cd src && uv run python manage.py shell
 
-pull-model:  ## Pull qwen3:8b into the ollama service (first run only)
-	docker compose exec ollama ollama pull qwen3:8b
+pull-model:  ## Pull qwen3:8b into the local Ollama install (first run only)
+	ollama pull qwen3:8b
