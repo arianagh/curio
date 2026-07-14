@@ -21,6 +21,10 @@ db.sqlite3-journal
 .env
 .env.*
 
+# Local Docker Compose overrides (e.g. remapping a host port that conflicts
+# with another project) — personal to a machine, not part of the repo default
+compose.override.yaml
+
 # Test / lint / type-check artifacts
 .pytest_cache/
 .mypy_cache/
