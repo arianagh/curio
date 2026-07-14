@@ -5,8 +5,10 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Article
-from .services import fetch_and_summarize
+from curio.enrichment.service import enrich
+
+from .models import Article, Tag
+from .services import fetch_article
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,8 @@ def ingest_article(self, article_id: str) -> None:
         return
 
     try:
-        result = fetch_and_summarize(article.url)
+        fetched = fetch_article(article.url)
+        result = enrich(fetched.content)
     except httpx.HTTPError as exc:
         if self.request.retries >= self.max_retries:
             logger.exception(
@@ -51,8 +54,8 @@ def ingest_article(self, article_id: str) -> None:
         article.save(update_fields=["status", "updated_at"])
         return
 
-    article.title = result.title
-    article.content = result.content
+    article.title = fetched.title
+    article.content = fetched.content
     article.summary = result.summary
     article.status = Article.Status.ENRICHED
     article.fetched_at = timezone.now()
@@ -66,3 +69,10 @@ def ingest_article(self, article_id: str) -> None:
             "updated_at",
         ]
     )
+
+    tag_names = {name.strip().lower() for name in result.tags if name.strip()}
+    tags = [
+        Tag.objects.get_or_create(owner=article.owner, name=name)[0]
+        for name in tag_names
+    ]
+    article.tags.set(tags)
