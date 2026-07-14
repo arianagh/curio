@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 import respx
@@ -10,8 +12,16 @@ def _mock_ingest_success(url: str, title: str = "Example", summary: str = "A sum
     respx.get(url).mock(
         return_value=httpx.Response(200, text=f"<html><title>{title}</title></html>")
     )
-    respx.post(f"{settings.OLLAMA_BASE_URL}/api/generate").mock(
-        return_value=httpx.Response(200, json={"response": summary})
+    respx.post(f"{settings.OLLAMA_BASE_URL}/api/chat").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps({"summary": summary, "tags": ["example"]}),
+                }
+            },
+        )
     )
 
 

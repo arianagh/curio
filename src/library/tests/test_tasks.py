@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 import respx
@@ -7,6 +9,20 @@ from library.models import Article
 from library.tasks import ingest_article
 
 
+def _mock_ollama_chat(summary="A short summary.", tags=("news", "tech")):
+    return respx.post(f"{settings.OLLAMA_BASE_URL}/api/chat").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps({"summary": summary, "tags": list(tags)}),
+                }
+            },
+        )
+    )
+
+
 @pytest.mark.django_db
 @respx.mock
 def test_ingest_article_success(user):
@@ -14,9 +30,7 @@ def test_ingest_article_success(user):
     respx.get("https://example.com/a").mock(
         return_value=httpx.Response(200, text="<html><title>Hello</title></html>")
     )
-    respx.post(f"{settings.OLLAMA_BASE_URL}/api/generate").mock(
-        return_value=httpx.Response(200, json={"response": "A short summary."})
-    )
+    _mock_ollama_chat(summary="A short summary.", tags=("news", "tech"))
 
     ingest_article.delay(str(article.id))
 
@@ -25,6 +39,7 @@ def test_ingest_article_success(user):
     assert article.title == "Hello"
     assert article.summary == "A short summary."
     assert article.fetched_at is not None
+    assert {tag.name for tag in article.tags.all()} == {"news", "tech"}
 
 
 @pytest.mark.django_db
@@ -41,9 +56,7 @@ def test_ingest_article_retries_then_succeeds(user, settings):
         httpx.Response(500),
         httpx.Response(200, text="<html><title>Recovered</title></html>"),
     ]
-    respx.post(f"{settings.OLLAMA_BASE_URL}/api/generate").mock(
-        return_value=httpx.Response(200, json={"response": "A short summary."})
-    )
+    _mock_ollama_chat()
 
     ingest_article.delay(str(article.id))
 
