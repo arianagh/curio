@@ -35,7 +35,7 @@ def enrich(content: str) -> EnrichmentResult:
             "format": EnrichmentResult.model_json_schema(),
             "stream": False,
         },
-        timeout=120,
+        timeout=300,
     )
     response.raise_for_status()
     message_content = response.json()["message"]["content"]
