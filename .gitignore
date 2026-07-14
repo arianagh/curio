@@ -12,3 +12,18 @@ wheels/
 
 # IDE
 .idea/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+
+# Environment
+.env
+.env.*
+
+# Test / lint / type-check artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

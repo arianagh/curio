@@ -35,6 +35,23 @@ cd src && uv run python manage.py runserver
 `make help` lists every available target. Once a `docker-compose.yml` lands (see
 below), `make infra` / `make up` / `make down` will bring up the full stack.
 
+## API
+
+All routes are mounted under `/api/v1/`. Authenticate with `POST /auth/token` to
+get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
+
+- `POST /auth/token` — `{username, password}` → `{access, refresh}`
+- `POST /articles` — `{url}`; `202` if a new ingest was queued, `200` (with the
+  existing article) if you'd already submitted that url
+- `GET /articles` — list your own articles; filter with `?tag=` and `?q=`
+- `GET /articles/{id}` / `DELETE /articles/{id}`
+- `GET /tags` — your own tags
+
+Articles are ingested asynchronously via Celery: `POST` returns immediately with
+`status: "pending"`, then the article moves `pending` → `fetching` →
+`enriched`/`failed` as the task fetches the url and summarizes it through Ollama.
+Poll `GET /articles/{id}` to watch it resolve.
+
 ## Follow the build
 
 This repo is tagged phase by phase — `v0.1` through `v1.0` — so you can check out any
