@@ -1,0 +1,18 @@
+services:
+  redis:
+    image: redis:7-alpine
+
+  worker:
+    build: .
+    volumes:
+      - ./src:/app/src
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      # Ollama isn't containerized yet (coming in a later phase) — reach the
+      # host-run instance through the docker-provided gateway host.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis

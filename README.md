@@ -32,8 +32,42 @@ cd src && uv run python manage.py migrate
 cd src && uv run python manage.py runserver
 ```
 
-`make help` lists every available target. Once a `docker-compose.yml` lands (see
-below), `make infra` / `make up` / `make down` will bring up the full stack.
+`make help` lists every available target. `compose.yaml` currently covers Redis and
+the Celery worker; `make infra` / `make up` / `make down` will bring up the full
+stack once Postgres and Ollama land as Docker services in a later phase.
+
+## Try it
+
+Everything below assumes `make check` has already passed and the database is
+migrated (see Quick start).
+
+1. Start Ollama and pull the model ingest uses, if you haven't already (runs on the
+   host for now — it'll move into `compose.yaml` in a later phase):
+   ```
+   ollama serve &
+   ollama pull qwen3:8b
+   ```
+2. Start Redis + the Celery worker, and the API, in two terminals:
+   ```
+   make up                                    # terminal 1: redis + worker (Docker)
+   cd src && uv run python manage.py runserver  # terminal 2: the API
+   ```
+3. Create a user and log in:
+   ```
+   make superuser                             # prompts for username/password
+   TOKEN=$(curl -s localhost:8000/api/v1/auth/token \
+     -H "Content-Type: application/json" \
+     -d '{"username": "you", "password": "your-password"}' | jq -r .access)
+   ```
+4. Submit an article and poll it until it's enriched:
+   ```
+   curl -s localhost:8000/api/v1/articles \
+     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com"}'
+
+   curl -s localhost:8000/api/v1/articles/<id-from-above> \
+     -H "Authorization: Bearer $TOKEN"
+   ```
 
 ## API
 
@@ -50,7 +84,9 @@ get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
 Articles are ingested asynchronously via Celery: `POST` returns immediately with
 `status: "pending"`, then the article moves `pending` → `fetching` →
 `enriched`/`failed` as the task fetches the url and summarizes it through Ollama.
-Poll `GET /articles/{id}` to watch it resolve.
+Poll `GET /articles/{id}` to watch it resolve. Fetch/summarize failures are retried
+up to 3 times with exponential backoff before the article is marked `failed`; a task
+re-run on an already-`enriched` article is a no-op.
 
 ## Follow the build
 
@@ -67,9 +103,11 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.2-library` — accounts (JWT auth) and library (`Article`/`Tag`)
-core domain: owner-scoped models, the articles/tags API, and async ingest via Celery
-+ Ollama. Still no Docker Compose file.
+**Current phase:** `v0.3-async` — hardens ingest: retry with exponential backoff on
+fetch/summarize failures, an idempotency guard against redelivered/duplicate task
+runs, ingest logic extracted into `library/services.py`, and a first
+`compose.yaml` (Redis + Celery worker). Postgres and Ollama will join it as Docker
+services in a later phase.
 
 ## Contributing
 
