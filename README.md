@@ -67,8 +67,9 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `chore/phase-0-scaffold` — a bare `django-admin startproject` plus
-this repo's tooling. No apps, no Docker Compose file, and no tagged release yet.
+**Current phase:** `v0.2-library` — accounts (JWT auth) and library (`Article`/`Tag`)
+core domain: owner-scoped models, the articles/tags API, and async ingest via Celery
++ Ollama. Still no Docker Compose file.
 
 ## Contributing
 
