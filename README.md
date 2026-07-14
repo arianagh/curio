@@ -32,25 +32,23 @@ cd src && uv run python manage.py migrate
 cd src && uv run python manage.py runserver
 ```
 
-`make help` lists every available target. `compose.yaml` currently covers Redis and
-the Celery worker; `make infra` / `make up` / `make down` will bring up the full
-stack once Postgres and Ollama land as Docker services in a later phase.
+`make help` lists every available target. `compose.yaml` currently covers Redis,
+Ollama, and the Celery worker; `make infra` / `make up` / `make down` will bring up
+the full stack once Postgres lands as a Docker service in a later phase.
 
 ## Try it
 
 Everything below assumes `make check` has already passed and the database is
 migrated (see Quick start).
 
-1. Start Ollama and pull the model ingest uses, if you haven't already (runs on the
-   host for now — it'll move into `compose.yaml` in a later phase):
+1. Start Redis + Ollama + the Celery worker, and the API, in two terminals:
    ```
-   ollama serve &
-   ollama pull qwen3:8b
+   make up                                       # terminal 1: redis + ollama + worker (Docker)
+   cd src && uv run python manage.py runserver   # terminal 2: the API
    ```
-2. Start Redis + the Celery worker, and the API, in two terminals:
+2. Pull the model ingest uses into the Ollama container (first run only):
    ```
-   make up                                    # terminal 1: redis + worker (Docker)
-   cd src && uv run python manage.py runserver  # terminal 2: the API
+   make pull-model
    ```
 3. Create a user and log in:
    ```
@@ -83,10 +81,12 @@ get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
 
 Articles are ingested asynchronously via Celery: `POST` returns immediately with
 `status: "pending"`, then the article moves `pending` → `fetching` →
-`enriched`/`failed` as the task fetches the url and summarizes it through Ollama.
-Poll `GET /articles/{id}` to watch it resolve. Fetch/summarize failures are retried
-up to 3 times with exponential backoff before the article is marked `failed`; a task
-re-run on an already-`enriched` article is a no-op.
+`enriched`/`failed` as the task fetches the url, then enriches it — a summary and
+3-5 tags, generated in one structured-output call to Ollama's `/api/chat` and
+attached to the article automatically. Poll `GET /articles/{id}` to watch it
+resolve. Fetch/enrich failures are retried up to 3 times with exponential backoff
+before the article is marked `failed`; a task re-run on an already-`enriched`
+article is a no-op.
 
 ## Follow the build
 
@@ -103,11 +103,12 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.3-async` — hardens ingest: retry with exponential backoff on
-fetch/summarize failures, an idempotency guard against redelivered/duplicate task
-runs, ingest logic extracted into `library/services.py`, and a first
-`compose.yaml` (Redis + Celery worker). Postgres and Ollama will join it as Docker
-services in a later phase.
+**Current phase:** `v0.4-enrichment` — splits ingest into a fetch step
+(`library/services.fetch_article`) and a separate enrichment step
+(`curio/enrichment`) that asks Ollama's `/api/chat` for a JSON-schema-constrained
+summary + tags, then attaches the tags to the article. Ollama joins `compose.yaml`
+as a Docker service with a healthcheck; Postgres and a containerized `web` service
+are still outstanding.
 
 ## Contributing
 
