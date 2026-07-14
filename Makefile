@@ -36,16 +36,16 @@ types:  ## Type-check
 check: lint fmt-check types test  ## Full local quality gate (same as /verify)
 
 migrate:  ## Apply migrations
-	uv run python manage.py migrate
+	cd src && uv run python manage.py migrate
 
 migrations:  ## Make migrations
-	uv run python manage.py makemigrations
+	cd src && uv run python manage.py makemigrations
 
 superuser:  ## Create a Django superuser
-	uv run python manage.py createsuperuser
+	cd src && uv run python manage.py createsuperuser
 
 shell:  ## Django shell (auto-imports models on 5.2)
-	uv run python manage.py shell
+	cd src && uv run python manage.py shell
 
 pull-model:  ## Pull qwen3:8b into the ollama service (first run only)
 	docker compose exec ollama ollama pull qwen3:8b

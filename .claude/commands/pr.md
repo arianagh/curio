@@ -2,9 +2,9 @@
 description: Draft a PR description and the gh command for the current branch
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git branch:*)
 ---
-## This branch vs main
-!`git log main..HEAD --oneline`
-!`git diff main...HEAD --stat`
+## This branch vs master
+!`git log master..HEAD --oneline`
+!`git diff master...HEAD --stat`
 
 Write a PR description with short sections:
 - **Summary** — what changed and why
