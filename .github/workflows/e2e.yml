@@ -86,7 +86,12 @@ jobs:
       - name: Start Celery worker
         run: |
           cd src
-          nohup uv run celery -A curio worker -l info > ../worker.log 2>&1 &
+          # setsid makes this its own process group leader, so $! is a PGID
+          # we can kill as a whole tree later — plain `nohup cmd &` leaves
+          # celery's prefork pool children as orphans the runner has to
+          # force-clean at job end, which stalls teardown for minutes.
+          setsid nohup uv run celery -A curio worker -l info > ../worker.log 2>&1 &
+          echo "CELERY_PGID=$!" >> "$GITHUB_ENV"
           for i in $(seq 1 30); do
             uv run celery -A curio inspect ping -t 2 >/dev/null 2>&1 && break
             sleep 2
@@ -95,7 +100,10 @@ jobs:
       - name: Start API server
         run: |
           cd src
-          nohup uv run python manage.py runserver 0.0.0.0:8000 > ../server.log 2>&1 &
+          # Same reasoning as the worker: runserver's autoreloader spawns a
+          # child process, so this needs process-group cleanup too.
+          setsid nohup uv run python manage.py runserver 0.0.0.0:8000 > ../server.log 2>&1 &
+          echo "SERVER_PGID=$!" >> "$GITHUB_ENV"
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/api/v1/openapi.json >/dev/null && break
             sleep 1
@@ -108,3 +116,10 @@ jobs:
         run: |
           echo "--- worker.log ---"; cat worker.log || true
           echo "--- server.log ---"; cat server.log || true
+
+      - name: Stop worker/server/Ollama
+        if: always()
+        run: |
+          kill -- "-$CELERY_PGID" 2>/dev/null || true
+          kill -- "-$SERVER_PGID" 2>/dev/null || true
+          docker rm -f ollama 2>/dev/null || true
