@@ -37,3 +37,31 @@ def test_enrich_raises_http_error_when_ollama_unreachable():
 
     with pytest.raises(httpx.HTTPError):
         enrich("<html>some article text</html>")
+
+
+@respx.mock
+def test_enrich_raises_http_error_on_5xx_response():
+    respx.post(f"{settings.OLLAMA_BASE_URL}/api/chat").mock(
+        return_value=httpx.Response(500)
+    )
+
+    with pytest.raises(httpx.HTTPError):
+        enrich("<html>some article text</html>")
+
+
+@respx.mock
+def test_enrich_raises_on_malformed_json_response():
+    respx.post(f"{settings.OLLAMA_BASE_URL}/api/chat").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "message": {
+                    "role": "assistant",
+                    "content": "not valid json",
+                }
+            },
+        )
+    )
+
+    with pytest.raises(ValueError):
+        enrich("<html>some article text</html>")

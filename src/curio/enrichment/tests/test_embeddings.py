@@ -25,3 +25,13 @@ def test_get_embedding_raises_http_error_when_ollama_unreachable():
 
     with pytest.raises(httpx.HTTPError):
         get_embedding("some article text")
+
+
+@respx.mock
+def test_get_embedding_raises_http_error_on_5xx_response():
+    respx.post(f"{settings.OLLAMA_BASE_URL}/api/embeddings").mock(
+        return_value=httpx.Response(500)
+    )
+
+    with pytest.raises(httpx.HTTPError):
+        get_embedding("some article text")
