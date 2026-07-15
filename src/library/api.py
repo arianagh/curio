@@ -1,14 +1,20 @@
 import hashlib
 import uuid
 
-from django.db.models import Q
+from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.db.models import F, Q, Window
+from django.db.models.functions import Rank
 from django.shortcuts import get_object_or_404
 from ninja import Router, Status
 from ninja_jwt.authentication import JWTAuth
+from pgvector.django import CosineDistance
 
 from .models import Article, Tag
 from .schemas import ArticleCreateIn, ArticleOut, TagOut
 from .tasks import ingest_article
+
+SIMILAR_TO_LIMIT = 20
+RRF_K = 60
 
 articles_router = Router(auth=JWTAuth())
 tags_router = Router(auth=JWTAuth())
@@ -27,8 +33,33 @@ def create_article(request, data: ArticleCreateIn):
 
 
 @articles_router.get("", response=list[ArticleOut])
-def list_articles(request, tag: str | None = None, q: str | None = None):
+def list_articles(
+    request,
+    tag: str | None = None,
+    q: str | None = None,
+    similar_to: uuid.UUID | None = None,
+):
     queryset = Article.objects.filter(owner=request.auth)
+
+    if similar_to:
+        source = get_object_or_404(queryset, id=similar_to, embedding__isnull=False)
+        candidates = queryset.exclude(id=source.id)
+        search_vector = SearchVector("title", "summary", "content")
+        search_query = SearchQuery(f"{source.title} {source.summary}")
+
+        candidates = candidates.annotate(
+            rank_fts=Window(
+                expression=Rank(),
+                order_by=SearchRank(search_vector, search_query).desc(),
+            ),
+            rank_vec=Window(
+                expression=Rank(),
+                order_by=CosineDistance("embedding", source.embedding).asc(),
+            ),
+        ).annotate(
+            rrf_score=1.0 / (RRF_K + F("rank_fts")) + 1.0 / (RRF_K + F("rank_vec"))
+        )
+        return candidates.order_by("-rrf_score")[:SIMILAR_TO_LIMIT]
 
     if tag:
         queryset = queryset.filter(tags__owner=request.auth, tags__name=tag)

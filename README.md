@@ -20,35 +20,40 @@ release — so you can follow the whole build from an empty scaffold to a workin
 - [`uv`](https://docs.astral.sh/uv/getting-started/installation/) — manages the Python
   version (3.14) and dependencies; nothing else to install by hand
 - [Docker](https://docs.docker.com/get-docker/) — runs the local Postgres, Redis, and
-  Ollama services (see note below on current phase)
+  Ollama services
 - [`gh`](https://cli.github.com/) — the GitHub CLI, used to open PRs and cut releases
 
 ## Quick start
 
 ```
 uv sync              # install dependencies into .venv
+make infra           # start Postgres + Redis + Ollama (needed for migrate/test below)
 make check           # lint + format-check + type-check + test
 cd src && uv run python manage.py migrate
 cd src && uv run python manage.py runserver
 ```
 
-`make help` lists every available target. `compose.yaml` currently covers Redis,
-Ollama, and the Celery worker; `make infra` / `make up` / `make down` will bring up
-the full stack once Postgres lands as a Docker service in a later phase.
+`make help` lists every available target. `compose.yaml` covers Postgres, Redis,
+Ollama, and the Celery worker; `make infra` starts just the infra services (for the
+host-run API/tests), `make up` builds and starts the full stack including the
+worker, `make down` stops it. Postgres is reachable from the host at
+`localhost:5433` (not `5432`, to avoid colliding with any other local Postgres) —
+see `compose.override.yaml`.
 
 ## Try it
 
 Everything below assumes `make check` has already passed and the database is
 migrated (see Quick start).
 
-1. Start Redis + Ollama + the Celery worker, and the API, in two terminals:
+1. Start Postgres + Redis + Ollama + the Celery worker, and the API, in two terminals:
    ```
-   make up                                       # terminal 1: redis + ollama + worker (Docker)
+   make up                                       # terminal 1: db + redis + ollama + worker (Docker)
    cd src && uv run python manage.py runserver   # terminal 2: the API
    ```
-2. Pull the model ingest uses into the Ollama container (first run only):
+2. Pull the models ingest uses into the Ollama container (first run only):
    ```
-   make pull-model
+   make pull-model         # qwen3:8b, for enrichment
+   make pull-embed-model   # nomic-embed-text, for embeddings
    ```
 3. Create a user and log in:
    ```
@@ -77,18 +82,32 @@ to get a JWT pair, then send `Authorization: Bearer <access>` on the rest:
 - `POST /auth/token` — `{username, password}` → `{access, refresh}`
 - `POST /articles` — `{url}`; `202` if a new ingest was queued, `200` (with the
   existing article) if you'd already submitted that url
-- `GET /articles` — list your own articles; filter with `?tag=` and `?q=`
+- `GET /articles` — list your own articles; filter with `?tag=` and `?q=`, or pass
+  `?similar_to=<id>` instead for semantic "more like this" (see below)
 - `GET /articles/{id}` / `DELETE /articles/{id}`
 - `GET /tags` — your own tags
 
 Articles are ingested asynchronously via Celery: `POST` returns immediately with
 `status: "pending"`, then the article moves `pending` → `fetching` →
 `enriched`/`failed` as the task fetches the url, then enriches it — a summary and
-3-5 tags, generated in one structured-output call to Ollama's `/api/chat` and
-attached to the article automatically. Poll `GET /articles/{id}` to watch it
-resolve. Fetch/enrich failures are retried up to 3 times with exponential backoff
-before the article is marked `failed`; a task re-run on an already-`enriched`
-article is a no-op.
+3-5 tags, generated in one structured-output call to Ollama's `/api/chat`, plus an
+embedding from Ollama's `/api/embeddings` (`nomic-embed-text`) — attached to the
+article automatically. Poll `GET /articles/{id}` to watch it resolve. Fetch/enrich
+failures are retried up to 3 times with exponential backoff before the article is
+marked `failed`; a task re-run on an already-`enriched` article is a no-op.
+
+`GET /articles?similar_to=<id>` ranks your other articles by how similar they are
+to the given one, blending full-text relevance (Postgres `SearchRank` against the
+source article's own title/summary) and vector similarity (`pgvector` cosine
+distance between embeddings) via Reciprocal Rank Fusion, so neither signal has to
+be normalized against the other's scale. 404s if the article doesn't exist, isn't
+yours, or hasn't been embedded yet. Articles ingested before this phase won't have
+an embedding until backfilled:
+```
+cd src && uv run python manage.py backfill_embeddings
+```
+Safe to interrupt and re-run — each article is embedded and saved individually, so
+a partial run just leaves the remaining articles to pick up next time.
 
 ## Follow the build
 
@@ -105,12 +124,13 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.4-enrichment` — splits ingest into a fetch step
-(`library/services.fetch_article`) and a separate enrichment step
-(`curio/enrichment`) that asks Ollama's `/api/chat` for a JSON-schema-constrained
-summary + tags, then attaches the tags to the article. Ollama joins `compose.yaml`
-as a Docker service with a healthcheck; Postgres and a containerized `web` service
-are still outstanding.
+**Current phase:** `v0.5-vectors` — Postgres (with the `pgvector` extension) joins
+`compose.yaml` as a real Docker service, replacing SQLite. `Article` gets a vector
+`embedding`, generated via Ollama's `/api/embeddings` (`nomic-embed-text`) right
+after enrichment; a `backfill_embeddings` management command covers articles
+ingested before this phase. `GET /articles?similar_to=<id>` ranks by a Reciprocal
+Rank Fusion of full-text and vector similarity. A containerized `web` service is
+still outstanding.
 
 ## Contributing
 

@@ -1,4 +1,21 @@
 services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: curio
+      POSTGRES_USER: curio
+      POSTGRES_PASSWORD: curio
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U curio -d curio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   redis:
     image: redis:7-alpine
     ports:
@@ -23,7 +40,14 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       OLLAMA_BASE_URL: http://ollama:11434
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: curio
+      DB_USER: curio
+      DB_PASSWORD: curio
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_started
       ollama:
@@ -31,3 +55,4 @@ services:
 
 volumes:
   ollama_data:
+  pgdata:

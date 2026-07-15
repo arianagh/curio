@@ -5,6 +5,7 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
+from curio.enrichment.embeddings import get_embedding
 from curio.enrichment.service import enrich
 
 from .models import Article, Tag
@@ -39,6 +40,7 @@ def ingest_article(self, article_id: str) -> None:
     try:
         fetched = fetch_article(article.url)
         result = enrich(fetched.content)
+        embedding = get_embedding(f"{fetched.title}\n\n{result.summary}")
     except httpx.HTTPError as exc:
         if self.request.retries >= self.max_retries:
             logger.exception(
@@ -57,6 +59,7 @@ def ingest_article(self, article_id: str) -> None:
     article.title = fetched.title
     article.content = fetched.content
     article.summary = result.summary
+    article.embedding = embedding
     article.status = Article.Status.ENRICHED
     article.fetched_at = timezone.now()
     article.save(
@@ -64,6 +67,7 @@ def ingest_article(self, article_id: str) -> None:
             "title",
             "content",
             "summary",
+            "embedding",
             "status",
             "fetched_at",
             "updated_at",
