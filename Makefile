@@ -31,7 +31,7 @@ fmt-check:  ## Check formatting (no changes)
 	uv run ruff format --check .
 
 types:  ## Type-check
-	uv run mypy src
+	uv run mypy src mcp_server
 
 check: lint fmt-check types test  ## Full local quality gate (same as /verify)
 
