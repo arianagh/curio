@@ -41,8 +41,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "ninja",
+    "django_htmx",
     "accounts",
     "library",
+    "ui",
 ]
 
 NINJA_JWT = {
@@ -68,9 +70,14 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+LOGIN_URL = "ui:login"
+LOGIN_REDIRECT_URL = "ui:article_list"
+LOGOUT_REDIRECT_URL = "ui:login"
 
 ROOT_URLCONF = "curio.urls"
 

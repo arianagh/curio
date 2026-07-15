@@ -1,0 +1,28 @@
+<tr id="article-{{ article.id }}" class="border-b border-neutral-200 last:border-0">
+  <td class="py-3 pr-3">
+    <a href="{% url 'ui:article_detail' article.id %}" class="font-medium text-neutral-900 hover:text-indigo-600">
+      {{ article.title|default:article.url }}
+    </a>
+    {% if article.tags.all %}
+      <div class="mt-1 flex flex-wrap gap-1">
+        {% for tag in article.tags.all %}
+          {% include "ui/partials/_tag_pill.html" with tag_name=tag.name %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </td>
+  <td class="py-3 pr-3 whitespace-nowrap">
+    {% include "ui/partials/_status_badge.html" %}
+  </td>
+  <td class="py-3 text-right">
+    <button
+      hx-delete="{% url 'ui:article_delete' article.id %}"
+      hx-confirm="Delete this article?"
+      hx-target="closest tr"
+      hx-swap="outerHTML swap:0.2s"
+      class="text-xs text-neutral-400 hover:text-red-600"
+    >
+      Delete
+    </button>
+  </td>
+</tr>

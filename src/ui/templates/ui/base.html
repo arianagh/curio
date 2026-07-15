@@ -1,0 +1,44 @@
+<!doctype html>
+{% load static %}
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Curio{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'ui/css/app.css' %}" />
+    <script src="{% static 'ui/js/htmx.min.js' %}" defer></script>
+  </head>
+  <body
+    class="min-h-full bg-neutral-50 text-neutral-900 antialiased"
+    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+    hx-boost="true"
+  >
+    <header class="border-b border-neutral-200 bg-white">
+      <div class="mx-auto flex max-w-2xl items-center justify-between px-6 py-4">
+        <a href="{% url 'ui:article_list' %}" class="text-lg font-semibold tracking-tight">
+          Curio
+        </a>
+        {% if user.is_authenticated %}
+          <nav class="flex items-center gap-4 text-sm text-neutral-600">
+            <a href="{% url 'ui:article_list' %}" class="hover:text-neutral-900">Articles</a>
+            <a href="{% url 'ui:logout' %}" class="hover:text-neutral-900">Logout</a>
+          </nav>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-2xl px-6 py-8">
+      {% if messages %}
+        <ul class="mb-6 space-y-2">
+          {% for message in messages %}
+            <li class="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-700">
+              {{ message }}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

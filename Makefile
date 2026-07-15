@@ -1,7 +1,7 @@
 # Curio task runner.  Run `make help` to list targets.
 # The app runs on Python 3.14 via uv; infra (db, redis, ollama) runs in Docker.
 .DEFAULT_GOAL := help
-.PHONY: help infra up down logs test lint fmt fmt-check types check migrate migrations superuser shell pull-model pull-embed-model
+.PHONY: help infra up down logs test lint fmt fmt-check types check migrate migrations superuser shell pull-model pull-embed-model css css-watch
 
 help:  ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -52,3 +52,9 @@ pull-model:  ## Pull qwen3:8b into the ollama service (first run only)
 
 pull-embed-model:  ## Pull nomic-embed-text into the ollama service (first run only)
 	docker compose exec ollama ollama pull nomic-embed-text
+
+css:  ## Compile Tailwind CSS (requires bin/tailwindcss — see CLAUDE.md)
+	./bin/tailwindcss -i src/ui/static_src/css/input.css -o src/ui/static/ui/css/app.css --minify
+
+css-watch:  ## Rebuild Tailwind CSS on change (dev loop)
+	./bin/tailwindcss -i src/ui/static_src/css/input.css -o src/ui/static/ui/css/app.css --watch
