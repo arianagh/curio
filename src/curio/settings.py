@@ -51,6 +51,8 @@ NINJA_JWT = {
 }
 
 OLLAMA_BASE_URL = env.ollama_base_url
+OLLAMA_CHAT_MODEL = env.ollama_chat_model
+OLLAMA_EMBED_MODEL = env.ollama_embed_model
 
 CELERY_BROKER_URL = env.celery_broker_url
 CELERY_RESULT_BACKEND = env.celery_result_backend

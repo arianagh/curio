@@ -1,0 +1,106 @@
+name: E2E (real stack)
+
+# Manual only — a real Ollama chat call is slow even on a small model and the
+# model pull is a third-party network dependency outside GitHub's control, so
+# this doesn't run on every push. Trigger it from the Actions tab when you want
+# a real-stack check (real Celery worker, real broker, real Ollama).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DB_HOST: localhost
+  DB_PORT: "5432"
+  DB_NAME: curio
+  DB_USER: curio
+  DB_PASSWORD: curio
+  CELERY_BROKER_URL: redis://localhost:6379/0
+  CELERY_RESULT_BACKEND: redis://localhost:6379/0
+  CELERY_TASK_ALWAYS_EAGER: "false"
+  OLLAMA_BASE_URL: http://localhost:11434
+  # Same family as production (qwen3:8b) but ~10x smaller — this job is
+  # checking real network/worker wiring, not model quality.
+  OLLAMA_CHAT_MODEL: qwen2.5:0.5b
+  OLLAMA_EMBED_MODEL: nomic-embed-text
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: curio
+          POSTGRES_USER: curio
+          POSTGRES_PASSWORD: curio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U curio -d curio"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: Restore Ollama model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/ollama-cache
+          key: ollama-models-v1-${{ env.OLLAMA_CHAT_MODEL }}-${{ env.OLLAMA_EMBED_MODEL }}
+
+      - name: Start Ollama
+        run: |
+          mkdir -p ~/ollama-cache
+          docker run -d --name ollama -p 11434:11434 \
+            -v ~/ollama-cache:/root/.ollama \
+            ollama/ollama:latest
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:11434/ >/dev/null && break
+            sleep 2
+          done
+
+      - name: Pull models (no-op if cached)
+        run: |
+          docker exec ollama ollama pull "$OLLAMA_CHAT_MODEL"
+          docker exec ollama ollama pull "$OLLAMA_EMBED_MODEL"
+
+      - run: cd src && uv run python manage.py migrate
+
+      - name: Start Celery worker
+        run: |
+          cd src
+          nohup uv run celery -A curio worker -l info > ../worker.log 2>&1 &
+          for i in $(seq 1 30); do
+            uv run celery -A curio inspect ping -t 2 >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+      - name: Start API server
+        run: |
+          cd src
+          nohup uv run python manage.py runserver 0.0.0.0:8000 > ../server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/v1/openapi.json >/dev/null && break
+            sleep 1
+          done
+
+      - run: uv run python scripts/e2e_smoke.py
+
+      - name: Show worker/server logs on failure
+        if: failure()
+        run: |
+          echo "--- worker.log ---"; cat worker.log || true
+          echo "--- server.log ---"; cat server.log || true
