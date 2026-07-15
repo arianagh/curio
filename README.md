@@ -27,6 +27,7 @@ release — so you can follow the whole build from an empty scaffold to a workin
 
 ```
 uv sync              # install dependencies into .venv
+uv run pre-commit install  # optional: run lint/format/type-check on every commit
 make infra           # start Postgres + Redis + Ollama (needed for migrate/test below)
 make check           # lint + format-check + type-check + test
 cd src && uv run python manage.py migrate
@@ -124,13 +125,13 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.5-vectors` — Postgres (with the `pgvector` extension) joins
-`compose.yaml` as a real Docker service, replacing SQLite. `Article` gets a vector
-`embedding`, generated via Ollama's `/api/embeddings` (`nomic-embed-text`) right
-after enrichment; a `backfill_embeddings` management command covers articles
-ingested before this phase. `GET /articles?similar_to=<id>` ranks by a Reciprocal
-Rank Fusion of full-text and vector similarity. A containerized `web` service is
-still outstanding.
+**Current phase:** `v0.6-tested` — no new endpoints; this phase closes test-coverage
+gaps instead. `library/services.py`'s `fetch_article` (previously untested) and the
+`enrichment` module's HTTP-error/malformed-response edge cases now have dedicated
+tests, plus `factory-boy` factories for `User`/`Article` and one end-to-end test that
+exercises save → enrich → search through the real API with Ollama mocked. A
+`code-reviewer` Claude Code subagent and `.pre-commit-config.yaml` (ruff, mypy) round
+out the phase. A containerized `web` service is still outstanding.
 
 ## Contributing
 
