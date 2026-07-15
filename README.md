@@ -14,6 +14,8 @@ release — so you can follow the whole build from an empty scaffold to a workin
 - Running local infra (Postgres, Redis, Ollama) with Docker Compose
 - A phase → branch → PR → tag workflow, and using Claude Code slash commands to
   keep that workflow consistent
+- Enforcing that workflow with CI: a GitHub Actions quality gate on every PR, an
+  image build via `docker buildx bake`, and Dependabot for dependency upkeep
 
 ## Prerequisites
 
@@ -110,6 +112,21 @@ cd src && uv run python manage.py backfill_embeddings
 Safe to interrupt and re-run — each article is embedded and saved individually, so
 a partial run just leaves the remaining articles to pick up next time.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every PR and every push to `master`:
+
+- **`quality`** — the same `make check` gate (ruff, ruff format --check, mypy,
+  `pytest --cov`), against real `pgvector/pgvector:pg17` and `redis` service
+  containers, so it's the exact same Postgres image `compose.yaml` uses, not a
+  stand-in.
+- **`build`** — builds the worker image with `docker buildx bake` (config in
+  `docker-bake.hcl`) on every PR to catch a broken `Dockerfile` early; only pushes
+  to `ghcr.io/arianagh/curio` on a push to `master`.
+
+Dependabot (`.github/dependabot.yml`) checks `uv` dependencies, GitHub Actions, and
+the Docker base image weekly and opens PRs against the same `quality` gate.
+
 ## Follow the build
 
 This repo is tagged phase by phase — `v0.1` through `v1.0` — so you can check out any
@@ -125,13 +142,14 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.6-tested` — no new endpoints; this phase closes test-coverage
-gaps instead. `library/services.py`'s `fetch_article` (previously untested) and the
-`enrichment` module's HTTP-error/malformed-response edge cases now have dedicated
-tests, plus `factory-boy` factories for `User`/`Article` and one end-to-end test that
-exercises save → enrich → search through the real API with Ollama mocked. A
-`code-reviewer` Claude Code subagent and `.pre-commit-config.yaml` (ruff, mypy) round
-out the phase. A containerized `web` service is still outstanding.
+**Current phase:** `v0.7-ci` — no new endpoints; this phase automates the quality
+gate instead. GitHub Actions now runs `make check`'s lint/format/type/test steps
+against real Postgres (`pgvector/pgvector:pg17`) and Redis service containers on
+every PR and push to `master`, builds the worker image with `docker buildx bake`
+on every PR, and pushes it to `ghcr.io/arianagh/curio` once a PR merges. Dependabot
+keeps `uv`, Actions, and the Docker base image current, and a PR template mirrors
+the sections `/pr` already drafts. A containerized `web` service is still
+outstanding.
 
 ## Contributing
 
