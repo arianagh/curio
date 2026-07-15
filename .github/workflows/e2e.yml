@@ -76,6 +76,10 @@ jobs:
         run: |
           docker exec ollama ollama pull "$OLLAMA_CHAT_MODEL"
           docker exec ollama ollama pull "$OLLAMA_EMBED_MODEL"
+          # The container writes as root; actions/cache's post-job save runs
+          # as the runner user and can't tar root-owned files, so the cache
+          # would silently never persist without this.
+          sudo chown -R "$(id -u):$(id -g)" ~/ollama-cache
 
       - run: cd src && uv run python manage.py migrate
 
