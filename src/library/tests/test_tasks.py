@@ -10,6 +10,9 @@ from library.tasks import ingest_article
 
 
 def _mock_ollama_chat(summary="A short summary.", tags=("news", "tech")):
+    respx.post(f"{settings.OLLAMA_BASE_URL}/api/embeddings").mock(
+        return_value=httpx.Response(200, json={"embedding": [0.1] * 768})
+    )
     return respx.post(f"{settings.OLLAMA_BASE_URL}/api/chat").mock(
         return_value=httpx.Response(
             200,
@@ -39,6 +42,7 @@ def test_ingest_article_success(user):
     assert article.title == "Hello"
     assert article.summary == "A short summary."
     assert article.fetched_at is not None
+    assert article.embedding is not None
     assert {tag.name for tag in article.tags.all()} == {"news", "tech"}
 
 

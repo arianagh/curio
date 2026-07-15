@@ -23,6 +23,9 @@ def _mock_ingest_success(url: str, title: str = "Example", summary: str = "A sum
             },
         )
     )
+    respx.post(f"{settings.OLLAMA_BASE_URL}/api/embeddings").mock(
+        return_value=httpx.Response(200, json={"embedding": [0.1] * 768})
+    )
 
 
 @pytest.mark.django_db

@@ -1,7 +1,7 @@
 # Curio task runner.  Run `make help` to list targets.
 # The app runs on Python 3.14 via uv; infra (db, redis, ollama) runs in Docker.
 .DEFAULT_GOAL := help
-.PHONY: help infra up down logs test lint fmt fmt-check types check migrate migrations superuser shell pull-model
+.PHONY: help infra up down logs test lint fmt fmt-check types check migrate migrations superuser shell pull-model pull-embed-model
 
 help:  ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -49,3 +49,6 @@ shell:  ## Django shell (auto-imports models on 5.2)
 
 pull-model:  ## Pull qwen3:8b into the ollama service (first run only)
 	docker compose exec ollama ollama pull qwen3:8b
+
+pull-embed-model:  ## Pull nomic-embed-text into the ollama service (first run only)
+	docker compose exec ollama ollama pull nomic-embed-text
