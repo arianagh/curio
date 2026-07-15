@@ -1,8 +1,7 @@
-import hashlib
 import uuid
 
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
-from django.db.models import F, Q, Window
+from django.db.models import F, Window
 from django.db.models.functions import Rank
 from django.shortcuts import get_object_or_404
 from ninja import Router, Status
@@ -11,7 +10,7 @@ from pgvector.django import CosineDistance
 
 from .models import Article, Tag
 from .schemas import ArticleCreateIn, ArticleOut, TagOut
-from .tasks import ingest_article
+from .services import filter_articles, get_or_create_article
 
 SIMILAR_TO_LIMIT = 20
 RRF_K = 60
@@ -22,14 +21,8 @@ tags_router = Router(auth=JWTAuth())
 
 @articles_router.post("", response={200: ArticleOut, 202: ArticleOut})
 def create_article(request, data: ArticleCreateIn):
-    url_hash = hashlib.sha256(data.url.encode()).hexdigest()
-    existing = Article.objects.filter(owner=request.auth, url_hash=url_hash).first()
-    if existing is not None:
-        return Status(200, existing)
-
-    article = Article.objects.create(owner=request.auth, url=data.url)
-    ingest_article.delay(str(article.id))
-    return Status(202, article)
+    article, created = get_or_create_article(request.auth, data.url)
+    return Status(202 if created else 200, article)
 
 
 @articles_router.get("", response=list[ArticleOut])
@@ -61,15 +54,7 @@ def list_articles(
         )
         return candidates.order_by("-rrf_score")[:SIMILAR_TO_LIMIT]
 
-    if tag:
-        queryset = queryset.filter(tags__owner=request.auth, tags__name=tag)
-
-    if q:
-        queryset = queryset.filter(
-            Q(title__icontains=q) | Q(content__icontains=q) | Q(summary__icontains=q)
-        )
-
-    return queryset.distinct()
+    return filter_articles(request.auth, tag=tag, q=q)
 
 
 @articles_router.get("/{article_id}", response=ArticleOut)

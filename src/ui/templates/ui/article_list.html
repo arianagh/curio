@@ -1,0 +1,59 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Articles · Curio{% endblock %}
+
+{% block content %}
+  <form
+    hx-post="{% url 'ui:article_add' %}"
+    hx-target="#article-rows"
+    hx-swap="afterbegin"
+    hx-on::article-added="this.reset()"
+    class="mb-4 flex gap-2"
+  >
+    {% csrf_token %}
+    <input
+      type="url"
+      name="url"
+      placeholder="https://example.com/an-article"
+      required
+      class="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+    />
+    <button
+      type="submit"
+      class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+    >
+      Add
+    </button>
+  </form>
+
+  <div id="add-article-error"></div>
+
+  <form
+    hx-get="{% url 'ui:article_list' %}"
+    hx-target="#article-list-container"
+    hx-push-url="true"
+    hx-trigger="keyup changed delay:300ms from:input, change from:select"
+    class="mb-6 flex gap-2"
+  >
+    <input
+      type="search"
+      name="q"
+      value="{{ q|default:'' }}"
+      placeholder="Search…"
+      class="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+    />
+    <select
+      name="tag"
+      class="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+    >
+      <option value="">All tags</option>
+      {% for t in tags %}
+        <option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <div id="article-list-container">
+    {% include "ui/partials/_article_list.html" %}
+  </div>
+{% endblock %}

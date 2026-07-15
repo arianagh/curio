@@ -1,0 +1,13 @@
+<table class="w-full text-sm">
+  <tbody id="article-rows">
+    {% for article in articles %}
+      {% include "ui/partials/_article_row.html" %}
+    {% empty %}
+      <tr id="article-rows-empty">
+        <td colspan="3" class="rounded-lg border border-dashed border-neutral-300 px-4 py-8 text-center text-sm text-neutral-500">
+          No articles yet — add one above.
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

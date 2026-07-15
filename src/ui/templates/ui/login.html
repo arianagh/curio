@@ -1,0 +1,46 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Log in · Curio{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-sm">
+    <div class="rounded-lg border border-neutral-200 bg-white p-6">
+      <h1 class="mb-6 text-base font-semibold">Log in</h1>
+
+      {% if form.errors %}
+        <p class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          Incorrect username or password.
+        </p>
+      {% endif %}
+
+      <form method="post" class="space-y-4">
+        {% csrf_token %}
+        <div>
+          <label for="id_username" class="mb-1 block text-sm text-neutral-600">Username</label>
+          <input
+            type="text"
+            name="username"
+            id="id_username"
+            autofocus
+            class="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label for="id_password" class="mb-1 block text-sm text-neutral-600">Password</label>
+          <input
+            type="password"
+            name="password"
+            id="id_password"
+            class="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+        >
+          Log in
+        </button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% if article.status == "pending" %}
+  <span
+    id="status-{{ article.id }}"
+    class="inline-block rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600"
+    hx-get="{% url 'ui:article_status' article.id %}"
+    hx-trigger="every 3s"
+    hx-swap="outerHTML"
+  >pending</span>
+{% elif article.status == "fetching" %}
+  <span
+    id="status-{{ article.id }}"
+    class="inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+    hx-get="{% url 'ui:article_status' article.id %}"
+    hx-trigger="every 3s"
+    hx-swap="outerHTML"
+  >fetching</span>
+{% elif article.status == "enriched" %}
+  <span id="status-{{ article.id }}" class="inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">
+    enriched
+  </span>
+{% else %}
+  <span id="status-{{ article.id }}" class="inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700">
+    failed
+  </span>
+{% endif %}

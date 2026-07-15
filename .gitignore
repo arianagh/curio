@@ -31,3 +31,6 @@ compose.override.yaml
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Tailwind standalone CLI binary — platform-specific, download per CLAUDE.md
+bin/
