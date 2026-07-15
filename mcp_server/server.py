@@ -7,6 +7,7 @@ Run directly: `uv run python mcp_server/server.py`. Requires CURIO_MCP_TOKEN
 import os
 import sys
 from pathlib import Path
+from uuid import UUID
 
 import django
 from asgiref.sync import sync_to_async
@@ -20,7 +21,7 @@ django.setup()
 
 from library.models import Article  # noqa: E402
 from mcp_server.auth import AuthConfigError, resolve_user  # noqa: E402
-from mcp_server.service import search_articles  # noqa: E402
+from mcp_server.service import fetch_article, search_articles  # noqa: E402
 
 mcp = FastMCP("curio-library")
 
@@ -47,6 +48,23 @@ async def search_library(query: str) -> list[dict]:
     """Search the current user's saved articles by title, content, or summary."""
     articles = await sync_to_async(search_articles, thread_sensitive=True)(_user, query)
     return [_serialize_summary(article) for article in articles]
+
+
+@mcp.tool()
+async def get_article(id: str) -> dict:
+    """Fetch one saved article by id, including its full content."""
+    try:
+        article = await sync_to_async(fetch_article, thread_sensitive=True)(
+            _user, UUID(id)
+        )
+    except (Article.DoesNotExist, ValueError) as exc:
+        raise ValueError(f"No article found with id {id!r}") from exc
+
+    return {
+        **_serialize_summary(article),
+        "content": article.content,
+        "status": article.status,
+    }
 
 
 if __name__ == "__main__":

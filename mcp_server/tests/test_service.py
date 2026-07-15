@@ -1,7 +1,8 @@
 import pytest
 
+from library.models import Article
 from library.tests.factories import ArticleFactory, UserFactory
-from mcp_server.service import search_articles
+from mcp_server.service import fetch_article, search_articles
 
 
 @pytest.mark.django_db
@@ -34,3 +35,21 @@ def test_search_articles_scoped_to_owner():
     results = search_articles(user, "django")
 
     assert results == []
+
+
+@pytest.mark.django_db
+def test_fetch_article_returns_owned_article():
+    user = UserFactory()
+    article = ArticleFactory(owner=user)
+
+    assert fetch_article(user, article.id) == article
+
+
+@pytest.mark.django_db
+def test_fetch_article_raises_for_other_owners_article():
+    user = UserFactory()
+    other = UserFactory()
+    article = ArticleFactory(owner=other)
+
+    with pytest.raises(Article.DoesNotExist):
+        fetch_article(user, article.id)
