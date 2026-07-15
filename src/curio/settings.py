@@ -95,8 +95,12 @@ WSGI_APPLICATION = "curio.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env.db_name,
+        "USER": env.db_user,
+        "PASSWORD": env.db_password,
+        "HOST": env.db_host,
+        "PORT": env.db_port,
     }
 }
 

@@ -27,3 +27,15 @@ def test_tag_unique_owner_name(user):
 
     with pytest.raises(IntegrityError):
         Tag.objects.create(owner=user, name="python")
+
+
+@pytest.mark.django_db
+def test_article_embedding_defaults_to_none_and_can_be_set(user):
+    article = Article.objects.create(owner=user, url="https://example.com/e")
+    assert article.embedding is None
+
+    article.embedding = [0.1] * 768
+    article.save(update_fields=["embedding"])
+    article.refresh_from_db()
+
+    assert list(article.embedding) == pytest.approx([0.1] * 768)

@@ -4,6 +4,9 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from pgvector.django import HnswIndex, VectorField
+
+EMBEDDING_DIMENSIONS = 768
 
 
 class Tag(models.Model):
@@ -67,6 +70,12 @@ class Article(models.Model):
     fetched_at = models.DateTimeField(
         null=True, blank=True, verbose_name=_("fetched at")
     )
+    embedding = VectorField(
+        dimensions=EMBEDDING_DIMENSIONS,
+        null=True,
+        blank=True,
+        verbose_name=_("embedding"),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -76,7 +85,16 @@ class Article(models.Model):
                 fields=["owner", "url_hash"], name="unique_owner_url_hash"
             )
         ]
-        indexes = [models.Index(fields=["owner", "-created_at"])]
+        indexes = [
+            models.Index(fields=["owner", "-created_at"]),
+            HnswIndex(
+                name="article_embedding_hnsw",
+                fields=["embedding"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_cosine_ops"],
+            ),
+        ]
         ordering = ["-created_at"]
         verbose_name = _("article")
         verbose_name_plural = _("articles")

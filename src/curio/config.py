@@ -9,5 +9,11 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6380/0"
     celery_task_always_eager: bool = False
 
+    db_name: str = "curio"
+    db_user: str = "curio"
+    db_password: str = "curio"
+    db_host: str = "localhost"
+    db_port: int = 5433
+
 
 settings = Settings()
