@@ -11,7 +11,7 @@ dependencies = [
     "django-ninja-jwt>=5.4.4",
     "httpx>=0.28.1",
     "pgvector>=0.3.6",
-    "psycopg[binary]>=3.2.3",
+    "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "redis>=8.0.1",
 ]
