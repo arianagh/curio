@@ -161,3 +161,79 @@ def test_list_articles_requires_auth(client):
     response = client.get("/api/v1/articles")
 
     assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_similar_to_ranks_closer_embedding_first(client, user, auth_header):
+    same_vector = [1.0] + [0.0] * 767
+    orthogonal_vector = [0.0, 1.0] + [0.0] * 766
+
+    source = Article.objects.create(
+        owner=user,
+        url="https://example.com/source",
+        title="Unrelated title",
+        summary="Unrelated summary",
+        status=Article.Status.ENRICHED,
+        embedding=same_vector,
+    )
+    close = Article.objects.create(
+        owner=user,
+        url="https://example.com/close",
+        title="Something else",
+        summary="Something else entirely",
+        status=Article.Status.ENRICHED,
+        embedding=same_vector,
+    )
+    far = Article.objects.create(
+        owner=user,
+        url="https://example.com/far",
+        title="Something else",
+        summary="Something else entirely",
+        status=Article.Status.ENRICHED,
+        embedding=orthogonal_vector,
+    )
+
+    response = client.get(
+        "/api/v1/articles",
+        {"similar_to": str(source.id)},
+        headers=auth_header,
+    )
+
+    ids = [item["id"] for item in response.json()]
+    assert str(source.id) not in ids
+    assert ids.index(str(close.id)) < ids.index(str(far.id))
+
+
+@pytest.mark.django_db
+def test_similar_to_is_owner_scoped(client, user, other_user, auth_header):
+    other_article = Article.objects.create(
+        owner=other_user,
+        url="https://example.com/other-source",
+        status=Article.Status.ENRICHED,
+        embedding=[0.1] * 768,
+    )
+
+    response = client.get(
+        "/api/v1/articles",
+        {"similar_to": str(other_article.id)},
+        headers=auth_header,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_similar_to_404_without_embedding(client, user, auth_header):
+    no_embedding = Article.objects.create(
+        owner=user,
+        url="https://example.com/no-embedding",
+        status=Article.Status.ENRICHED,
+    )
+
+    response = client.get(
+        "/api/v1/articles",
+        {"similar_to": str(no_embedding.id)},
+        headers=auth_header,
+    )
+
+    assert response.status_code == 404
