@@ -20,7 +20,7 @@ def enrich(content: str) -> EnrichmentResult:
     response = httpx.post(
         f"{settings.OLLAMA_BASE_URL}/api/chat",
         json={
-            "model": "qwen3:8b",
+            "model": settings.OLLAMA_CHAT_MODEL,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {

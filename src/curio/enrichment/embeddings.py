@@ -1,8 +1,6 @@
 import httpx
 from django.conf import settings
 
-EMBEDDING_MODEL = "nomic-embed-text"
-
 
 def get_embedding(text: str) -> list[float]:
     """Embed text via Ollama's embeddings API.
@@ -13,7 +11,7 @@ def get_embedding(text: str) -> list[float]:
     """
     response = httpx.post(
         f"{settings.OLLAMA_BASE_URL}/api/embeddings",
-        json={"model": EMBEDDING_MODEL, "prompt": text},
+        json={"model": settings.OLLAMA_EMBED_MODEL, "prompt": text},
         timeout=300,
     )
     response.raise_for_status()
