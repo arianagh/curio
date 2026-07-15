@@ -54,3 +54,46 @@ directly or go through a bake file.
   Actions cache (subject to the same size/eviction limits as everything else
   cached there) instead of a registry-based cache — simpler and needs no extra
   credentials, but not the most efficient option available.
+
+## Addendum: real-stack e2e workflow
+
+**Context.** `quality` mocks Ollama (`respx`) and runs Celery eager, so it
+verifies the API's contract but not real topology — exactly the class of bug
+(unpublished Redis port, too-short Ollama timeout) that's bitten this repo
+before mocked tests couldn't catch. Closing that gap meant running the actual
+`celery worker` process against a real broker and a real Ollama call, which
+raised three more forks: how to trigger it, how to keep it fast, and how to
+cache a multi-hundred-MB model download across runs.
+
+**Decision.**
+- **Trigger**: `workflow_dispatch` only — no push/PR/schedule. A real model
+  pull is a third-party network dependency GitHub doesn't control, and even a
+  small real inference call is slow enough that gating merges on it isn't
+  worth the flakiness risk. Run it by hand when a real-stack check is wanted.
+- **Model**: `qwen2.5:0.5b` instead of production's `qwen3:8b` — same family
+  (still exercises Ollama's structured-JSON `format` support), ~10x smaller,
+  fast enough that a full cold run (pull + real inference) finished in under
+  2 minutes. Moved both model names out of `enrichment/service.py`/
+  `embeddings.py` (previously hardcoded) into `OLLAMA_CHAT_MODEL`/
+  `OLLAMA_EMBED_MODEL` settings so the workflow can override just the model,
+  not application code.
+- **Ollama as a step, not a `services:` entry**: GitHub Actions starts service
+  containers before any step runs, so a service container's volume can never
+  be pre-seeded by a cache-restore step that runs later. Ollama runs via a
+  plain `docker run` step instead, bind-mounted to a path `actions/cache`
+  restores first.
+- **The smoke test is a standalone script (`scripts/e2e_smoke.py`), not a
+  pytest test**: it needs `CELERY_TASK_ALWAYS_EAGER=false` and a real running
+  server/worker outside the pytest-django test-client model entirely, so
+  reusing pytest's fixtures would have fought the tool rather than used it.
+
+**Trade-offs.**
+- Manual-only means real-stack regressions can sit unnoticed between runs —
+  it's a deliberate trade of coverage-recency for not slowing down every PR.
+- The first real dispatch (run 29423284537) passed the smoke test but the
+  cache-save step failed silently — the Ollama container writes its cache
+  directory as root, and `actions/cache`'s post-job save runs as the
+  unprivileged runner user, so `tar` couldn't read the root-owned files. Fixed
+  with an explicit `chown` after pulling models, before the job ends. Worth
+  remembering for any future job that bind-mounts a container's writes into a
+  path `actions/cache` is expected to persist.

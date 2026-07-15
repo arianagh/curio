@@ -127,6 +127,28 @@ a partial run just leaves the remaining articles to pick up next time.
 Dependabot (`.github/dependabot.yml`) checks `uv` dependencies, GitHub Actions, and
 the Docker base image weekly and opens PRs against the same `quality` gate.
 
+### Real-stack e2e (manual)
+
+`.github/workflows/e2e.yml` runs the real thing: a real Celery worker consuming
+from a real Redis broker, a real Ollama call (`qwen2.5:0.5b` — same family as
+production's `qwen3:8b`, ~10x smaller so it's fast enough for CI), hit over actual
+HTTP by `scripts/e2e_smoke.py`. `quality` mocks Ollama and runs Celery eager, so it
+can't catch real network/timeout/topology bugs the way this can — but a real model
+pull and inference call is too slow and third-party-network-dependent to gate every
+merge on, so it's `workflow_dispatch`-only (manual trigger, no push/PR/schedule).
+The pulled models are cached across runs via `actions/cache`, so only the first run
+after a cache eviction pays the download cost.
+
+Run it whenever you want a real-stack check:
+
+```
+gh workflow run e2e.yml --ref master
+gh run watch --exit-status $(gh run list --workflow=e2e.yml --limit 1 --json databaseId -q '.[0].databaseId')
+```
+
+Or from the GitHub UI: **Actions** tab → **E2E (real stack)** in the left sidebar →
+**Run workflow** → pick `master` → **Run workflow**.
+
 ## Follow the build
 
 This repo is tagged phase by phase — `v0.1` through `v1.0` — so you can check out any
