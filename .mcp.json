@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "curio-library": {
+      "command": "uv",
+      "args": ["run", "python", "mcp_server/server.py"],
+      "env": {
+        "CURIO_MCP_TOKEN": "${CURIO_MCP_TOKEN}"
+      }
+    }
+  }
+}

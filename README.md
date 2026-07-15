@@ -16,6 +16,9 @@ release — so you can follow the whole build from an empty scaffold to a workin
   keep that workflow consistent
 - Enforcing that workflow with CI: a GitHub Actions quality gate on every PR, an
   image build via `docker buildx bake`, and Dependabot for dependency upkeep
+- Exposing the same data through an MCP server (`mcp_server/`) so an AI assistant
+  like Claude Code can search and read a user's library directly via the Django
+  ORM, reusing the app's existing JWT auth instead of a new mechanism
 
 ## Prerequisites
 
@@ -112,6 +115,37 @@ cd src && uv run python manage.py backfill_embeddings
 Safe to interrupt and re-run — each article is embedded and saved individually, so
 a partial run just leaves the remaining articles to pick up next time.
 
+## MCP server
+
+`mcp_server/` exposes a user's library to Claude Code (or any MCP client) over
+stdio, using the Django ORM directly rather than going through the HTTP API:
+
+- `search_library(query)` — the same title/content/summary match `GET
+  /articles?q=` uses, scoped to one user
+- `get_article(id)` — a single article, including its full `content` (the REST
+  API's `GET /articles/{id}` omits it)
+
+**Auth:** the server acts as one Django user, resolved from a JWT refresh token
+in `CURIO_MCP_TOKEN` (not a new auth mechanism — the same `ninja_jwt` tokens
+`POST /auth/token` already issues). Mint one and export it:
+
+```
+TOKEN=$(curl -s localhost:8000/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username": "you", "password": "your-password"}' | jq -r .refresh)
+export CURIO_MCP_TOKEN=$TOKEN
+```
+
+The refresh token (7-day lifetime) is used instead of the 15-minute access
+token so a long-running MCP server doesn't need to re-authenticate mid-session.
+
+**Registering it:** `.mcp.json` at the repo root already declares a
+`curio-library` server (`uv run python mcp_server/server.py`), reading
+`CURIO_MCP_TOKEN` from your shell. Open Claude Code in this repo and it'll
+prompt to approve the project-scoped server on first use; run `/mcp` any time
+to check its connection status or see `search_library`/`get_article` listed
+as available tools.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every PR and every push to `master`:
@@ -164,14 +198,12 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.7-ci` — no new endpoints; this phase automates the quality
-gate instead. GitHub Actions now runs `make check`'s lint/format/type/test steps
-against real Postgres (`pgvector/pgvector:pg17`) and Redis service containers on
-every PR and push to `master`, builds the worker image with `docker buildx bake`
-on every PR, and pushes it to `ghcr.io/arianagh/curio` once a PR merges. Dependabot
-keeps `uv`, Actions, and the Docker base image current, and a PR template mirrors
-the sections `/pr` already drafts. A containerized `web` service is still
-outstanding.
+**Current phase:** `v0.8-mcp` — a new `mcp_server/` package exposes
+`search_library` and `get_article` over MCP, reusing the Django ORM directly
+(no raw SQL, no HTTP round-trip) and the existing JWT auth (a refresh token in
+`CURIO_MCP_TOKEN` resolves which user the server acts as). Registered via a
+checked-in `.mcp.json`, so opening Claude Code in this repo is enough to pick
+it up. See [MCP server](#mcp-server) above.
 
 ## Contributing
 
