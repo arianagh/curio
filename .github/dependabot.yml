@@ -8,6 +8,11 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # pyproject.toml pins django==5.2.* deliberately (the LTS line) — don't
+      # propose rewriting that pin to a non-LTS major (e.g. 6.0).
+      - dependency-name: "django"
+        update-types: ["version-update:semver-major"]
     labels: ["dependencies"]
 
   - package-ecosystem: "github-actions"
