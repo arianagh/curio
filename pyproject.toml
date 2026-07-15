@@ -43,3 +43,7 @@ django_settings_module = "curio.settings"
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "curio.settings"
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/migrations/*", "*/tests/*", "src/manage.py"]
