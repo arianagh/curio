@@ -19,6 +19,10 @@ release — so you can follow the whole build from an empty scaffold to a workin
 - Exposing the same data through an MCP server (`mcp_server/`) so an AI assistant
   like Claude Code can search and read a user's library directly via the Django
   ORM, reusing the app's existing JWT auth instead of a new mechanism
+- Building a browser UI with plain Django templates + htmx instead of a SPA
+  framework, styled with Tailwind CSS (compiled via a standalone CLI — no
+  Node/npm toolchain) — and running it on Django sessions, a second auth
+  mechanism that sits next to the JWT API without either leaking into the other
 
 ## Prerequisites
 
@@ -39,6 +43,9 @@ cd src && uv run python manage.py migrate
 cd src && uv run python manage.py runserver
 ```
 
+`runserver` serves both the JSON API (`/api/v1/`) and the browser UI (`/`) —
+see [Try it](#try-it) below for testing either one.
+
 `make help` lists every available target. `compose.yaml` covers Postgres, Redis,
 Ollama, and the Celery worker; `make infra` starts just the infra services (for the
 host-run API/tests), `make up` builds and starts the full stack including the
@@ -49,26 +56,46 @@ see `compose.override.yaml`.
 ## Try it
 
 Everything below assumes `make check` has already passed and the database is
-migrated (see Quick start).
+migrated (see Quick start). Steps 1–3 are shared setup; then pick the browser
+UI or the raw API depending on what you want to see.
 
-1. Start Postgres + Redis + Ollama + the Celery worker, and the API, in two terminals:
+1. Start Postgres + Redis + Ollama + the Celery worker, and the app, in two terminals:
    ```
    make up                                       # terminal 1: db + redis + ollama + worker (Docker)
-   cd src && uv run python manage.py runserver   # terminal 2: the API
+   cd src && uv run python manage.py runserver   # terminal 2: the app (API + UI)
    ```
 2. Pull the models ingest uses into the Ollama container (first run only):
    ```
    make pull-model         # qwen3:8b, for enrichment
    make pull-embed-model   # nomic-embed-text, for embeddings
    ```
-3. Create a user and log in:
+3. Create a user:
    ```
-   make superuser                             # prompts for username/password
+   make superuser   # prompts for username/password
+   ```
+
+### Via the browser UI
+
+1. Visit `http://localhost:8000/` — you'll be redirected to `/login/`. Log in
+   with the user from step 3 above (there's no self-service sign-up; accounts
+   are created via `make superuser` or the Django admin).
+2. Paste a URL into the add-article field and submit. The new row appears
+   immediately with a **pending** badge, then updates itself in place —
+   **fetching** → **enriched** (or **failed**) — every few seconds with no
+   page reload, until Celery finishes ingesting it.
+3. Use the search box and tag dropdown to filter the list; click an
+   article's title to open its detail page (summary, tags, and a collapsible
+   raw-content preview); use **Delete** to remove it.
+
+### Via the API (curl)
+
+1. Log in to get a JWT:
+   ```
    TOKEN=$(curl -s localhost:8000/api/v1/auth/token \
      -H "Content-Type: application/json" \
      -d '{"username": "you", "password": "your-password"}' | jq -r .access)
    ```
-4. Submit an article and poll it until it's enriched:
+2. Submit an article and poll it until it's enriched:
    ```
    curl -s localhost:8000/api/v1/articles \
      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -77,6 +104,11 @@ migrated (see Quick start).
    curl -s localhost:8000/api/v1/articles/<id-from-above> \
      -H "Authorization: Bearer $TOKEN"
    ```
+
+The UI and the API read/write the same articles — an article added through
+one shows up in the other, since both sit on top of the same `library` app
+and Celery pipeline. They just don't share an auth mechanism (see
+[UI](#ui) below).
 
 ## API
 
@@ -114,6 +146,38 @@ cd src && uv run python manage.py backfill_embeddings
 ```
 Safe to interrupt and re-run — each article is embedded and saved individually, so
 a partial run just leaves the remaining articles to pick up next time.
+
+## UI
+
+`src/ui/` is a server-rendered browser UI — Django templates + htmx (no SPA
+framework, no JS build step) styled with Tailwind CSS v4 (compiled via its
+standalone CLI, no Node/npm). Routes:
+
+- `/login` / `/logout` — Django session auth. Login-only; there's no
+  sign-up route, accounts are created via `make superuser` or the admin.
+- `/` — your articles, with `?q=` and `?tag=` filters and an add-article form
+- `/articles/<id>/` — one article's summary, tags, status, and a
+  stripped-content preview (never raw HTML — the source page's markup is
+  scraped third-party content, so it's shown as plain text)
+
+The UI **does not use the JWT API** — it's a second, independent auth
+mechanism (Django sessions) that talks to the same `library` app models
+directly, not over HTTP. See [ADR 0007](docs/adr/0007-phase-9-browser-ui.md)
+for why.
+
+The status badge on each article polls itself via htmx every few seconds
+while `pending`/`fetching`, and stops once the article reaches `enriched` or
+`failed` — that's genuinely live, not a fixed-count refresh.
+
+If you change any Tailwind classes in `src/ui/templates/`, recompile the
+committed CSS (the standalone binary isn't committed — download it once):
+
+```
+mkdir -p bin
+curl -sLo bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64
+chmod +x bin/tailwindcss
+make css   # or `make css-watch` to rebuild on every save
+```
 
 ## MCP server
 
@@ -198,12 +262,10 @@ Browse the full list of phases on the
 [tags](https://github.com/arianagh/curio/tags). Each release's notes describe what
 that phase adds and what it's meant to teach.
 
-**Current phase:** `v0.8-mcp` — a new `mcp_server/` package exposes
-`search_library` and `get_article` over MCP, reusing the Django ORM directly
-(no raw SQL, no HTTP round-trip) and the existing JWT auth (a refresh token in
-`CURIO_MCP_TOKEN` resolves which user the server acts as). Registered via a
-checked-in `.mcp.json`, so opening Claude Code in this repo is enough to pick
-it up. See [MCP server](#mcp-server) above.
+**Current phase:** `v0.9-ui` — a new `ui` app adds a minimal, server-rendered
+browser UI (Django templates + htmx + Tailwind CSS, no SPA framework) on
+Django session auth, fully independent of the JWT API that `mcp_server/` and
+API clients use. See [UI](#ui) above.
 
 ## Contributing
 
